@@ -141,7 +141,7 @@ pub fn build_rate_limit_body(
         let parts: Vec<String> = usage_headers
             .iter()
             .filter_map(|(name, raw)| {
-                usage::parse_number(raw).map(|n| format!("\"{}\":{}", json_quote(name), fmt_num(n)))
+                usage::parse_number(raw).map(|n| format!("{}:{}", json_quote(name), fmt_num(n)))
             })
             .collect();
         usage.push_str(&parts.join(","));
@@ -254,5 +254,13 @@ mod tests {
         let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
         assert_eq!(v["rate"], json!("r\"x"));
         assert_eq!(v["payload"], json!("p\nq"));
+
+        // Usage header names go through json_quote as well; a quote inside the
+        // name must be escaped by that one call, not quoted a second time —
+        // a double quote pair reads as an empty key and then demands a colon.
+        let headers = vec![("a\"b".to_string(), json!(7))];
+        let body = build_rate_limit_body(0.0, &headers, None, "m", "l", None);
+        let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
+        assert_eq!(v["usage"], json!({"a\"b": 7}));
     }
 }
