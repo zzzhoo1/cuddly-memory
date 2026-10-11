@@ -1,0 +1,561 @@
+{
+  "dimension": [
+    {
+      "expected": "[\"inst-1\",\"gpt-4o\"]",
+      "instanceId": "inst-1",
+      "modelId": "gpt-4o"
+    },
+    {
+      "expected": "[\"\",\"\"]",
+      "instanceId": "",
+      "modelId": ""
+    },
+    {
+      "expected": "[\"with\\\"quote\",\"back\\\\slash\"]",
+      "instanceId": "with\"quote",
+      "modelId": "back\\slash"
+    },
+    {
+      "expected": "[\"unicode-é中文\",\"模型-🚀\"]",
+      "instanceId": "unicode-é中文",
+      "modelId": "模型-🚀"
+    },
+    {
+      "expected": "[\"line\\nbreak\",\"tab\\there\"]",
+      "instanceId": "line\nbreak",
+      "modelId": "tab\there"
+    },
+    {
+      "expected": "[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\"]",
+      "instanceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "modelId": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    }
+  ],
+  "responses": [
+    {
+      "body": {
+        "error": {
+          "code": "qpm_exceeded",
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "param": null,
+          "type": "rate_limit_error"
+        }
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 10,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 377,
+        "retryAfterSeconds": 37,
+        "tpm": 500,
+        "usedRequests": 11,
+        "usedTokens": 123
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "37",
+        "x-ratelimit-limit-input-tokens": "500",
+        "x-ratelimit-limit-requests": "10",
+        "x-ratelimit-remaining-input-tokens": "377",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "37"
+      },
+      "protocol": "openai",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "type": "rate_limit_error"
+        },
+        "type": "error"
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 10,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 377,
+        "retryAfterSeconds": 37,
+        "tpm": 500,
+        "usedRequests": 11,
+        "usedTokens": 123
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "37",
+        "x-ratelimit-limit-input-tokens": "500",
+        "x-ratelimit-limit-requests": "10",
+        "x-ratelimit-remaining-input-tokens": "377",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "37"
+      },
+      "protocol": "anthropic",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "code": "input_tpm_exceeded",
+          "message": "该模型输入 Token 用量已达上限，请稍后重试",
+          "param": null,
+          "type": "rate_limit_error"
+        }
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 20,
+        "reason": "tpm",
+        "remainingRequests": 17,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 0,
+        "tpm": 1000,
+        "usedRequests": 3,
+        "usedTokens": 1000
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "1000",
+        "x-ratelimit-limit-requests": "20",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "17",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "openai",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "message": "该模型输入 Token 用量已达上限，请稍后重试",
+          "type": "rate_limit_error"
+        },
+        "type": "error"
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 20,
+        "reason": "tpm",
+        "remainingRequests": 17,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 0,
+        "tpm": 1000,
+        "usedRequests": 3,
+        "usedTokens": 1000
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "1000",
+        "x-ratelimit-limit-requests": "20",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "17",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "anthropic",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "code": "input_tpm_exceeded",
+          "message": "该模型输入 Token 用量已达上限，请稍后重试",
+          "param": null,
+          "type": "rate_limit_error"
+        }
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 20,
+        "reason": "tpm",
+        "remainingRequests": 17,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 86400,
+        "tpm": 1000,
+        "usedRequests": 3,
+        "usedTokens": 1200
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "86400",
+        "x-ratelimit-limit-input-tokens": "1000",
+        "x-ratelimit-limit-requests": "20",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "17",
+        "x-ratelimit-reset-seconds": "86400"
+      },
+      "protocol": "openai",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "message": "该模型输入 Token 用量已达上限，请稍后重试",
+          "type": "rate_limit_error"
+        },
+        "type": "error"
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 20,
+        "reason": "tpm",
+        "remainingRequests": 17,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 86400,
+        "tpm": 1000,
+        "usedRequests": 3,
+        "usedTokens": 1200
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "86400",
+        "x-ratelimit-limit-input-tokens": "1000",
+        "x-ratelimit-limit-requests": "20",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "17",
+        "x-ratelimit-reset-seconds": "86400"
+      },
+      "protocol": "anthropic",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "code": "qpm_exceeded",
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "param": null,
+          "type": "rate_limit_error"
+        }
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 5,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 1,
+        "tpm": 0,
+        "usedRequests": 6,
+        "usedTokens": 0
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "0",
+        "x-ratelimit-limit-requests": "5",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "openai",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "type": "rate_limit_error"
+        },
+        "type": "error"
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": false,
+        "qpm": 5,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 0,
+        "retryAfterSeconds": 1,
+        "tpm": 0,
+        "usedRequests": 6,
+        "usedTokens": 0
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "0",
+        "x-ratelimit-limit-requests": "5",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "anthropic",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "code": "qpm_exceeded",
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "param": null,
+          "type": "rate_limit_error"
+        }
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": {},
+        "qpm": 5,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 0,
+        "retryAfterSeconds": -3,
+        "tpm": 500,
+        "usedRequests": 6,
+        "usedTokens": 9
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "500",
+        "x-ratelimit-limit-requests": "5",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "openai",
+      "status": 429
+    },
+    {
+      "body": {
+        "error": {
+          "message": "该模型请求频率已达上限，请稍后重试",
+          "type": "rate_limit_error"
+        },
+        "type": "error"
+      },
+      "decision": {
+        "allowed": false,
+        "degraded": {},
+        "qpm": 5,
+        "reason": "qpm",
+        "remainingRequests": 0,
+        "remainingTokens": 0,
+        "retryAfterSeconds": -3,
+        "tpm": 500,
+        "usedRequests": 6,
+        "usedTokens": 9
+      },
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": "1",
+        "x-ratelimit-limit-input-tokens": "500",
+        "x-ratelimit-limit-requests": "5",
+        "x-ratelimit-remaining-input-tokens": "0",
+        "x-ratelimit-remaining-requests": "0",
+        "x-ratelimit-reset-seconds": "1"
+      },
+      "protocol": "anthropic",
+      "status": 429
+    }
+  ],
+  "usage": [
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": null
+    },
+    {
+      "expected": 0,
+      "protocol": "anthropic",
+      "usage": null
+    },
+    {
+      "expected": 0,
+      "protocol": "openai"
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {}
+    },
+    {
+      "expected": 0,
+      "protocol": "anthropic",
+      "usage": {}
+    },
+    {
+      "expected": 100,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": 100
+      }
+    },
+    {
+      "expected": 100,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": 100.7
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": -5
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": 0
+      }
+    },
+    {
+      "expected": 42,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "42"
+      }
+    },
+    {
+      "expected": 42,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "42.9"
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "-3"
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "abc"
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": ""
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "NaN"
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": "Infinity"
+      }
+    },
+    {
+      "expected": 1e+21,
+      "protocol": "openai",
+      "usage": {
+        "prompt_tokens": 1e+21
+      }
+    },
+    {
+      "expected": 175,
+      "protocol": "anthropic",
+      "usage": {
+        "cache_creation_input_tokens": 25,
+        "cache_read_input_tokens": 50,
+        "input_tokens": 100
+      }
+    },
+    {
+      "expected": 100,
+      "protocol": "anthropic",
+      "usage": {
+        "input_tokens": 100
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "anthropic",
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 0
+      }
+    },
+    {
+      "expected": 10,
+      "protocol": "anthropic",
+      "usage": {
+        "cache_creation_input_tokens": {},
+        "cache_read_input_tokens": null,
+        "input_tokens": "10"
+      }
+    },
+    {
+      "expected": 78,
+      "protocol": "anthropic",
+      "usage": {
+        "cache_creation_input_tokens": "8",
+        "cache_read_input_tokens": -1,
+        "input_tokens": 70.2
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "openai",
+      "usage": {
+        "cache_read_input_tokens": 10,
+        "input_tokens": 70
+      }
+    },
+    {
+      "expected": 0,
+      "protocol": "anthropic",
+      "usage": {
+        "prompt_tokens": 500
+      }
+    },
+    {
+      "usage": {
+        "prompt_tokens": " 7"
+      },
+      "protocol": "openai",
+      "expected": 7,
+      "note": "leading whitespace"
+    },
+    {
+      "usage": {
+        "prompt_tokens": "0x10"
+      },
+      "protocol": "openai",
+      "expected": 16,
+      "note": "hex parse"
+    },
+    {
+      "usage": {
+        "prompt_tokens": " "
+      },
+      "protocol": "openai",
+      "expected": 0,
+      "note": "line separator -> NaN -> 0"
+    },
+    {
+      "usage": {
+        "prompt_tokens": "1e21"
+      },
+      "protocol": "openai",
+      "expected": 1e+21,
+      "note": "exceeds i64, stays float"
+    }
+  ]
+}

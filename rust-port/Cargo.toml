@@ -1,0 +1,21 @@
+[package]
+name = "anthropic-ratelimit-port"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# `preserve_order` makes serde_json::Map an IndexMap, so `json!` + to_vec
+# reproduces JS insertion order (JSON.stringify) instead of alphabetical order.
+# Required for the wire-byte assertion to be meaningful.
+serde_json = { version = "1", features = ["preserve_order"] }
+
+# Toolchain here is cargo/rustc 1.75, which cannot parse edition2024 manifests.
+# preserve_order pulls indexmap -> hashbrown; pin both to the last editions the
+# 1.75 resolver can handle (newer ones require `feature = "edition2024"`).
+indexmap = "=2.7.0"
+hashbrown = "=0.15.2"
+
+[lib]
+name = "anthropic_ratelimit_port"
+path = "src/lib.rs"

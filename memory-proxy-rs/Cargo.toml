@@ -1,0 +1,13 @@
+[package]
+name = "memory-proxy-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Fidelity Rust port of the deterministic core of TencentDB-Agent-MemoryProxy (rate-limit guard / usage normalization / dimension keys)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lib]
+name = "memory_proxy_rs"
+path = "src/lib.rs"

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: cargo test (all crates)
+    runs-on: ubuntu-latest
+    env:
+      # 三个 crate 共享一个 target 目录，便于 actions/cache 命中与复用依赖编译产物
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test ratelimit-core
+        run: cargo test --locked --manifest-path Cargo.toml
+
+      - name: Test memory-proxy-rs
+        run: cargo test --locked --manifest-path memory-proxy-rs/Cargo.toml
+
+      - name: Test anthropic-ratelimit-port
+        run: cargo test --locked --manifest-path rust-port/Cargo.toml

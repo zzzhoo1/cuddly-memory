@@ -1,0 +1,5 @@
+# Rust 构建产物（三个 crate 各自的 target / CI 共享 CARGO_TARGET_DIR）
+target/
+
+# npx/tsx 运行残留
+gen-err.log
