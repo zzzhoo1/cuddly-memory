@@ -122,7 +122,11 @@ fn json_quote(s: &str) -> String {
 }
 
 /// Build the request body the plugin sends to the rate-limit service.
-/// Usage fields are emitted only when parsing yields a usable number.
+///
+/// Shape (optional members appear only when their input is present):
+/// `{"now":N,"match":"<digest>","limit":"<digest>"[,"usage":{...}][,"rate":"..."][,"payload":"..."]}`.
+/// Usage members are emitted only when parsing yields a usable number; headers
+/// that do not parse are dropped (see `usage::parse_number`).
 pub fn build_rate_limit_body(
     now: f64,
     usage_headers: &[(String, Value)],
@@ -144,18 +148,19 @@ pub fn build_rate_limit_body(
         usage.push('}');
     }
     let rate_part = decision_rate
-        .map(|r| format!("\"rate\":{},", json_quote(r)))
+        .map(|r| format!(",\"rate\":{}", json_quote(r)))
         .unwrap_or_default();
     let payload_part = first_payload
         .map(|p| format!(",\"payload\":{}", json_quote(p)))
         .unwrap_or_default();
     format!(
-        "{{\"now\":{},\"match\":\"{}\",\"limit\":\"{}\",{}\"rate\":{}}}",
+        "{{\"now\":{},\"match\":\"{}\",\"limit\":\"{}\"{}{}{}}}",
         fmt_num(now),
         match_digest,
         limit_digest,
         usage,
-        rate_part.trim_end_matches(',')
+        rate_part,
+        payload_part
     )
 }
 
@@ -189,7 +194,7 @@ pub fn merge_configs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
     fn digest_skips_null_and_sorts_keys() {
@@ -201,5 +206,53 @@ mod tests {
             out.digest_hex,
             "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
         );
+    }
+
+    #[test]
+    fn body_minimal_shape() {
+        let body = build_rate_limit_body(1000.0, &[], None, "match-d", "limit-d", None);
+        let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
+        assert_eq!(
+            v,
+            json!({"now": 1000, "match": "match-d", "limit": "limit-d"})
+        );
+    }
+
+    #[test]
+    fn body_with_usage_rate_payload() {
+        let headers = vec![
+            ("tokens".to_string(), json!(5)),
+            ("unparsable".to_string(), json!("abc")),
+        ];
+        let body =
+            build_rate_limit_body(1000.5, &headers, Some("qpm"), "md", "ld", Some("hello"));
+        let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
+        assert_eq!(
+            v,
+            json!({
+                "now": 1000.5,
+                "match": "md",
+                "limit": "ld",
+                "usage": {"tokens": 5},
+                "rate": "qpm",
+                "payload": "hello"
+            })
+        );
+    }
+
+    #[test]
+    fn body_usage_empty_when_no_header_parses() {
+        let headers = vec![("bad".to_string(), json!("abc"))];
+        let body = build_rate_limit_body(1.0, &headers, None, "m", "l", None);
+        let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
+        assert_eq!(v["usage"], json!({}), "usage object present but empty");
+    }
+
+    #[test]
+    fn body_escapes_quoted_strings() {
+        let body = build_rate_limit_body(0.0, &[], Some("r\"x"), "m", "l", Some("p\nq"));
+        let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
+        assert_eq!(v["rate"], json!("r\"x"));
+        assert_eq!(v["payload"], json!("p\nq"));
     }
 }
