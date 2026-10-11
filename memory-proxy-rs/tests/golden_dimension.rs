@@ -28,7 +28,8 @@ fn golden_dimension_matches_ts() {
     for (i, c) in cases.iter().enumerate() {
         let got = dimension_field(&c.instance_id, &c.model_id);
         assert_eq!(
-            got, c.expected,
+            got,
+            c.expected,
             "dimension case{}: inst={:?} model={:?}",
             i + 1,
             c.instance_id,
@@ -40,10 +41,7 @@ fn golden_dimension_matches_ts() {
 /// golden 外的转义边界：控制字符 → `\u00XX`（JSON.stringify 用小写十六进制）。
 #[test]
 fn control_chars_escaped_lowercase_hex() {
-    assert_eq!(
-        dimension_field("a\u{01}b", "c"),
-        "[\"a\\u0001b\",\"c\"]"
-    );
+    assert_eq!(dimension_field("a\u{01}b", "c"), "[\"a\\u0001b\",\"c\"]");
     // 单引号与斜杠不转义（JSON.stringify 语义）
     assert_eq!(dimension_field("a'b/c", "d"), "[\"a'b/c\",\"d\"]");
 }

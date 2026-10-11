@@ -23,7 +23,14 @@ fn case(idx: usize, protocol: Protocol) {
     let raw = include_str!("../../golden.json");
     let v: Value = serde_json::from_str(raw).unwrap();
     let entry = &v["responses"][idx];
-    assert_eq!(entry["protocol"], json!(if protocol == Protocol::Openai { "openai" } else { "anthropic" }));
+    assert_eq!(
+        entry["protocol"],
+        json!(if protocol == Protocol::Openai {
+            "openai"
+        } else {
+            "anthropic"
+        })
+    );
     let decision: Decision = serde_json::from_value(entry["decision"].clone()).unwrap();
     let golden: GoldenResponse = serde_json::from_value(entry.clone()).unwrap();
 

@@ -53,12 +53,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Compact JSON of the 5 anthropic `decision` objects (golden.json, `body` removed).
-pub const GOLDEN_DECISIONS_ANTHROPIC: &str =
-    include_str!("../golden_decisions_anthropic.json");
+pub const GOLDEN_DECISIONS_ANTHROPIC: &str = include_str!("../golden_decisions_anthropic.json");
 
 /// Compact JSON of the 5 anthropic `{status, headers, body}` triples.
-pub const GOLDEN_RESPONSES_ANTHROPIC: &str =
-    include_str!("../golden_responses_anthropic.json");
+pub const GOLDEN_RESPONSES_ANTHROPIC: &str = include_str!("../golden_responses_anthropic.json");
 
 /// A decision as produced by `RedisRateLimitStore.checkRequest`.
 ///

@@ -526,36 +526,36 @@
       }
     },
     {
+      "expected": 7,
+      "note": "leading whitespace",
+      "protocol": "openai",
       "usage": {
         "prompt_tokens": " 7"
-      },
-      "protocol": "openai",
-      "expected": 7,
-      "note": "leading whitespace"
+      }
     },
     {
+      "expected": 16,
+      "note": "hex parse",
+      "protocol": "openai",
       "usage": {
         "prompt_tokens": "0x10"
-      },
-      "protocol": "openai",
-      "expected": 16,
-      "note": "hex parse"
+      }
     },
     {
+      "expected": 0,
+      "note": "line separator -> NaN -> 0",
+      "protocol": "openai",
       "usage": {
         "prompt_tokens": " "
-      },
-      "protocol": "openai",
-      "expected": 0,
-      "note": "line separator -> NaN -> 0"
+      }
     },
     {
+      "expected": 1e+21,
+      "note": "exceeds i64, stays float",
+      "protocol": "openai",
       "usage": {
         "prompt_tokens": "1e21"
-      },
-      "protocol": "openai",
-      "expected": 1e+21,
-      "note": "exceeds i64, stays float"
+      }
     }
   ]
 }

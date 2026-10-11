@@ -40,3 +40,74 @@ jobs:
 
       - name: Test anthropic-ratelimit-port
         run: cargo test --locked --manifest-path rust-port/Cargo.toml
+
+  lint:
+    name: rustfmt + clippy
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain (stable + rustfmt + clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: rustfmt --check
+        run: |
+          cargo fmt --manifest-path Cargo.toml -- --check
+          cargo fmt --manifest-path memory-proxy-rs/Cargo.toml -- --check
+          cargo fmt --manifest-path rust-port/Cargo.toml -- --check
+
+      - name: clippy
+        run: |
+          cargo clippy --locked --all-targets --manifest-path Cargo.toml -- -D warnings
+          cargo clippy --locked --all-targets --manifest-path memory-proxy-rs/Cargo.toml -- -D warnings
+          cargo clippy --locked --all-targets --manifest-path rust-port/Cargo.toml -- -D warnings
+
+  golden-repro:
+    name: golden.json reproducible from pinned upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UPSTREAM_REPO: https://github.com/TencentCloud/TencentDB-Agent-Memory.git
+      UPSTREAM_SHA: 8b86874a2daea49e3ff0fb53d699203146c5c77d
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node (for tsx)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch the pinned upstream MemoryProxy subtree
+        run: |
+          mkdir -p "$RUNNER_TEMP/up"
+          cd "$RUNNER_TEMP/up"
+          git init -q .
+          git remote add origin "$UPSTREAM_REPO"
+          git fetch -q --depth 1 origin "$UPSTREAM_SHA"
+          git checkout -q FETCH_HEAD -- MemoryProxy
+          echo "MEMORYPROXY_REPO=$RUNNER_TEMP/up/MemoryProxy" >> "$GITHUB_ENV"
+
+      - name: Install the reference implementation's runtime dependency
+        run: npm install --prefix "$RUNNER_TEMP/up" --no-save --no-package-lock --no-fund --no-audit ioredis@5.11.1
+
+      - name: Regenerate and compare
+        run: |
+          npx --yes tsx@4.23.15 gen-golden.mts > "$RUNNER_TEMP/golden.json"
+          if cmp -s "$RUNNER_TEMP/golden.json" golden.json; then
+            echo "golden.json is byte-identical to a fresh run against the pinned implementation"
+          else
+            diff -u golden.json "$RUNNER_TEMP/golden.json" | head -80 || true
+            exit 1
+          fi
+
+      - name: Verify the protocol split files are in sync
+        run: node scripts/split-golden.mjs --check

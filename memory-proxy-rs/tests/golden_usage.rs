@@ -38,7 +38,8 @@ fn golden_usage_matches_ts() {
         // usage=None（JS undefined 与 JSON null 对 getActualInputTokens 等价）
         let got = get_actual_input_tokens(c.usage.as_ref(), &c.protocol);
         assert_eq!(
-            got, c.expected,
+            got,
+            c.expected,
             "usage case{} {:?} protocol={}",
             i + 1,
             c.usage,
@@ -53,8 +54,16 @@ fn number_field_finite_guard() {
     // JSON 里 NaN/Infinity 无法直书；用 "NaN" 字符串与巨大数近似覆盖，
     // 真正的数字 NaN 用例由 parse 层保证（serde 拒绝 NaN 字面量）。
     assert_eq!(number_field(Some(&json!("NaN"))), 0.0);
-    assert_eq!(number_field(Some(&json!("Infinity"))), 0.0, "Number(\"Infinity\")=∞ → !isFinite → 0");
-    assert_eq!(number_field(Some(&json!(1e21))), 1e21, "巨大整数保持（floor 恒等）");
+    assert_eq!(
+        number_field(Some(&json!("Infinity"))),
+        0.0,
+        "Number(\"Infinity\")=∞ → !isFinite → 0"
+    );
+    assert_eq!(
+        number_field(Some(&json!(1e21))),
+        1e21,
+        "巨大整数保持（floor 恒等）"
+    );
     assert_eq!(number_field(Some(&json!(null))), 0.0);
     assert_eq!(number_field(Some(&json!({}))), 0.0);
     assert_eq!(number_field(Some(&json!([1]))), 0.0);
@@ -67,9 +76,17 @@ fn number_field_string_semantics() {
     assert_eq!(number_field(Some(&json!("42"))), 42.0);
     assert_eq!(number_field(Some(&json!("42.9"))), 42.0, "floor 非四舍五入");
     assert_eq!(number_field(Some(&json!("-3"))), 0.0, "max(0,·) 钳负");
-    assert_eq!(number_field(Some(&json!(""))), 0.0, "Number(\"\")=0 → floor 0 → 0");
+    assert_eq!(
+        number_field(Some(&json!(""))),
+        0.0,
+        "Number(\"\")=0 → floor 0 → 0"
+    );
     assert_eq!(number_field(Some(&json!("abc"))), 0.0, "NaN 路径");
     assert_eq!(number_field(Some(&json!("  42 "))), 42.0, "Number 会 trim");
     assert_eq!(number_field(Some(&json!("0x2A"))), 42.0, "十六进制字面量");
-    assert_eq!(number_field(Some(&json!("017"))), 17.0, "无八进制，按十进制");
+    assert_eq!(
+        number_field(Some(&json!("017"))),
+        17.0,
+        "无八进制，按十进制"
+    );
 }

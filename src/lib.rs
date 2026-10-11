@@ -224,8 +224,7 @@ mod tests {
             ("tokens".to_string(), json!(5)),
             ("unparsable".to_string(), json!("abc")),
         ];
-        let body =
-            build_rate_limit_body(1000.5, &headers, Some("qpm"), "md", "ld", Some("hello"));
+        let body = build_rate_limit_body(1000.5, &headers, Some("qpm"), "md", "ld", Some("hello"));
         let v: Value = serde_json::from_str(&body).expect("body must be valid JSON");
         assert_eq!(
             v,

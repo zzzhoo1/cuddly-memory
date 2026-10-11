@@ -3,3 +3,6 @@ target/
 
 # npx/tsx 运行残留
 gen-err.log
+
+# 本地安装的 JS 依赖（golden 工具链按需安装，不入库）
+node_modules/

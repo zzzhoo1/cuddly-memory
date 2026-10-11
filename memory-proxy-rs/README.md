@@ -29,9 +29,13 @@ TencentDB-Agent-MemoryProxy（`/var/minis/shared/tdba/repo/MemoryProxy`）确定
 
 ## 运行
 
+CI（GitHub Actions）在 push 时执行三个 crate 的 `cargo test --locked`、`cargo fmt --check` /
+`cargo clippy -- -D warnings`，并校验 `golden.json` 可由 pinned 上游重新生成（见仓库根 README）。
+
+本地如需手动运行：
+
 ```bash
-export PATH=/root/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin:$PATH
-cd memory-proxy-rs && cargo test   # 16 passed, 0 warnings
+cargo test --manifest-path memory-proxy-rs/Cargo.toml
 ```
 
-工具链：rustup stable 1.99（apt cargo 1.75 无法解析 edition2024 依赖，勿用）。
+工具链：stable（cargo 1.75 无法解析本 crate 的 lockfile v4 与新版依赖，勿用）。

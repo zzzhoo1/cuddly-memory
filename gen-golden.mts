@@ -5,10 +5,16 @@
  * so the Rust side is verified against actual behavior, not a re-derived
  * spec that could share the translator's mistakes.
  *
- * Usage: npx tsx gen-golden.mts > golden.json
+ * Usage:
+ *   MEMORYPROXY_REPO=/path/to/MemoryProxy npx tsx gen-golden.mts > golden.json
+ *
+ * MEMORYPROXY_REPO defaults to the development checkout below. CI points it at
+ * a fresh checkout of the pinned upstream commit before regenerating, so the
+ * committed golden.json is provably reproducible from the reference
+ * implementation (see .github/workflows/ci.yml, job "golden-repro").
  */
 
-const REPO = "/var/minis/shared/tdba/repo/MemoryProxy";
+const REPO = process.env.MEMORYPROXY_REPO ?? "/var/minis/shared/tdba/repo/MemoryProxy";
 const { getActualInputTokens } = await import(`${REPO}/src/rate-limit/usage.js`);
 const { buildRateLimitResponse } = await import(`${REPO}/src/rate-limit/guard.js`);
 const { dimensionField } = await import(`${REPO}/src/rate-limit/redis-store.js`);
@@ -59,6 +65,13 @@ const usageCases = [
   { protocol: "anthropic", usage: { input_tokens: 70.2, cache_read_input_tokens: -1, cache_creation_input_tokens: "8" } },
   { protocol: "openai", usage: { input_tokens: 70, cache_read_input_tokens: 10 } }, // openai ignores anthropic fields
   { protocol: "anthropic", usage: { prompt_tokens: 500 } }, // anthropic ignores openai fields
+  // Boundary cases — same provenance rule as everything above: every value in
+  // golden.json, including these, must come out of this script. Never hand-edit
+  // golden.json; a value that only exists there is unreproducible.
+  { protocol: "openai", usage: { prompt_tokens: " 7" }, note: "leading whitespace" },
+  { protocol: "openai", usage: { prompt_tokens: "0x10" }, note: "hex parse" },
+  { protocol: "openai", usage: { prompt_tokens: "\u2028" }, note: "line separator -> NaN -> 0" },
+  { protocol: "openai", usage: { prompt_tokens: "1e21" }, note: "exceeds i64, stays float" },
 ];
 const usage = usageCases.map((c) => ({
   ...c,

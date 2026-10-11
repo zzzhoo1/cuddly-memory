@@ -27,11 +27,17 @@ fn assert_case(idx: usize) {
 
     // ---- status ----
     assert_eq!(built.status, golden.status, "case{}: status", idx + 1);
-    assert_eq!(built.status, 429, "case{}: TS builder hardcodes 429", idx + 1);
+    assert_eq!(
+        built.status,
+        429,
+        "case{}: TS builder hardcodes 429",
+        idx + 1
+    );
 
     // ---- headers, key by key (BTreeMap eq is an exact key-set + value match) ----
     assert_eq!(
-        built.headers, golden.headers,
+        built.headers,
+        golden.headers,
         "case{}: headers mismatch\n built={:?}\n golden={:?}",
         idx + 1,
         built.headers,
@@ -40,10 +46,11 @@ fn assert_case(idx: usize) {
 
     // ---- body ----
     // golden body is a key-sorted canon() rendering, so compare as JSON values.
-    let golden_body: Value = golden.body.clone();
+    let built_body: Value =
+        serde_json::from_slice(&built.body_bytes).expect("built body must be valid JSON");
     assert_eq!(
-        Value::from(serde_json::from_slice::<Value>(&built.body_bytes).unwrap()),
-        golden_body,
+        built_body,
+        golden.body,
         "case{}: body mismatch (built bytes as UTF-8: {:?})",
         idx + 1,
         String::from_utf8_lossy(&built.body_bytes)
@@ -53,7 +60,8 @@ fn assert_case(idx: usize) {
     assert_eq!(
         built.body_bytes,
         expected_wire_body(decision),
-        "case{}: wire body bytes", idx + 1
+        "case{}: wire body bytes",
+        idx + 1
     );
 
     // ---- decision field fidelity ----
@@ -61,7 +69,8 @@ fn assert_case(idx: usize) {
     assert_eq!(
         serde_json::to_value(decision).unwrap(),
         serde_json::to_value(&decisions[idx]).unwrap(),
-        "case{}: decision round-trip", idx + 1
+        "case{}: decision round-trip",
+        idx + 1
     );
 }
 
@@ -110,6 +119,10 @@ fn case9_negative_retry_clamped_to_1() {
     assert_eq!(built.headers.get("x-ratelimit-reset-seconds").unwrap(), "1");
     // No header carries "degraded".
     assert!(!built.headers.keys().any(|k| k.contains("degraded")));
-    assert_eq!(built.headers.len(), 7, "exactly 7 headers, degraded adds none");
+    assert_eq!(
+        built.headers.len(),
+        7,
+        "exactly 7 headers, degraded adds none"
+    );
     assert_case(4);
 }
