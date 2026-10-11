@@ -24,7 +24,7 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -32,14 +32,15 @@ jobs:
       - name: Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Test ratelimit-core
-        run: cargo test --locked --manifest-path Cargo.toml
-
-      - name: Test memory-proxy-rs
-        run: cargo test --locked --manifest-path memory-proxy-rs/Cargo.toml
-
-      - name: Test anthropic-ratelimit-port
-        run: cargo test --locked --manifest-path rust-port/Cargo.toml
+      # 一个步骤里跑三个 crate：任一失败都用累积状态继续，保证一次 CI
+      # 就能看到全部 crate 的结果（首个失败不会遮住其余）。
+      - name: Test all crates
+        run: |
+          status=0
+          cargo test --locked --manifest-path Cargo.toml || status=1
+          cargo test --locked --manifest-path memory-proxy-rs/Cargo.toml || status=1
+          cargo test --locked --manifest-path rust-port/Cargo.toml || status=1
+          exit "$status"
 
   lint:
     name: rustfmt + clippy
@@ -48,7 +49,7 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Rust toolchain (stable + rustfmt + clippy)
         uses: dtolnay/rust-toolchain@stable
@@ -60,15 +61,19 @@ jobs:
 
       - name: rustfmt --check
         run: |
-          cargo fmt --manifest-path Cargo.toml -- --check
-          cargo fmt --manifest-path memory-proxy-rs/Cargo.toml -- --check
-          cargo fmt --manifest-path rust-port/Cargo.toml -- --check
+          status=0
+          cargo fmt --manifest-path Cargo.toml -- --check || status=1
+          cargo fmt --manifest-path memory-proxy-rs/Cargo.toml -- --check || status=1
+          cargo fmt --manifest-path rust-port/Cargo.toml -- --check || status=1
+          exit "$status"
 
-      - name: clippy
+      - name: clippy (-D warnings)
         run: |
-          cargo clippy --locked --all-targets --manifest-path Cargo.toml -- -D warnings
-          cargo clippy --locked --all-targets --manifest-path memory-proxy-rs/Cargo.toml -- -D warnings
-          cargo clippy --locked --all-targets --manifest-path rust-port/Cargo.toml -- -D warnings
+          status=0
+          cargo clippy --locked --all-targets --manifest-path Cargo.toml -- -D warnings || status=1
+          cargo clippy --locked --all-targets --manifest-path memory-proxy-rs/Cargo.toml -- -D warnings || status=1
+          cargo clippy --locked --all-targets --manifest-path rust-port/Cargo.toml -- -D warnings || status=1
+          exit "$status"
 
   golden-repro:
     name: golden.json reproducible from pinned upstream
@@ -79,10 +84,10 @@ jobs:
       UPSTREAM_SHA: 8b86874a2daea49e3ff0fb53d699203146c5c77d
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Node (for tsx)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 

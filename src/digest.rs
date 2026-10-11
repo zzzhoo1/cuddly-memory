@@ -35,7 +35,15 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
         0x5be0cd19,
     ];
 
-    for chunk in msg.chunks_exact(64) {
+    // 填充保证长度恰为 64 的整数倍（0x80 + 补零 + 8 字节位长）。
+    // as_chunks 与 chunks_exact 等价，但不会触发 clippy::chunks_exact_to_as_chunks
+    // （CI 以 -D warnings 拦截）。leftover 恒为空，断言把不变式钉在代码里。
+    let (blocks, leftover) = msg.as_chunks::<64>();
+    assert!(
+        leftover.is_empty(),
+        "padded message length must be a multiple of 64"
+    );
+    for chunk in blocks {
         // 消息调度：前 16 字大端直读，其余按 σ0/σ1 递推。
         let mut w = [0u32; 64];
         for (i, word) in w.iter_mut().take(16).enumerate() {
