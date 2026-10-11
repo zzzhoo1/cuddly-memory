@@ -1,0 +1,774 @@
+diff --git a/MemoryCore/scripts/dbg-l1-raw.ts b/MemoryCore/scripts/dbg-l1-raw.ts
+new file mode 100644
+index 0000000..c3c27b6
+--- /dev/null
++++ b/MemoryCore/scripts/dbg-l1-raw.ts
+@@ -0,0 +1,54 @@
++/**
++ * Repro harness: run the real L1 extraction prompt through the real upstream and
++ * print the raw reply, so the failure mode can be read directly instead of
++ * inferred from aggregate counters.
++ *
++ * The user turn is assembled the same way StandaloneLLMRunner assembles it for
++ * pure-text calls: `prompt + outputContract`. Without the contract an agentic
++ * chat gateway downgrades the system-turn JSON spec to advisory context and
++ * answers in prose / fenced YAML — this harness lets you see that directly.
++ *
++ * Usage:
++ *   TDAI_LLM_BASE_URL=... TDAI_LLM_API_KEY=... TDAI_LLM_MODEL=... \
++ *     node --import tsx scripts/dbg-l1-raw.ts [--no-contract]
++ */
++import { createOpenAI } from "@ai-sdk/openai";
++import { generateText } from "ai";
++import {
++  getExtractMemoriesSystemPrompt,
++  formatExtractionPrompt,
++  L1_JSON_OUTPUT_CONTRACT,
++} from "../src/core/prompts/l1-extraction.js";
++
++const baseUrl = process.env.TDAI_LLM_BASE_URL;
++const apiKey = process.env.TDAI_LLM_API_KEY;
++const model = process.env.TDAI_LLM_MODEL;
++if (!baseUrl || !apiKey || !model) {
++  console.error("Required: TDAI_LLM_BASE_URL, TDAI_LLM_API_KEY, TDAI_LLM_MODEL");
++  process.exit(1);
++}
++
++const withContract = !process.argv.includes("--no-contract");
++
++const now = Date.now();
++const sys = getExtractMemoriesSystemPrompt("chat");
++const usr = formatExtractionPrompt({
++  newMessages: [
++    { id: "m1", role: "user", content: "我的个人偏好清单：1) 部署脚本必须先做健康检查再启动；2) 所有交付产物放 shared 目录不放 workspace；3) 远程服务器是 119.13.109.93，别名 vps，已配好密钥登录。", timestamp: now },
++    { id: "m2", role: "assistant", content: "收到，我把三条都记进长期记忆。", timestamp: now + 1000 },
++  ] as never,
++  backgroundMessages: [],
++  previousSceneName: "无",
++});
++
++const provider = createOpenAI({ baseURL: baseUrl, apiKey, compatibility: "compatible" });
++const res = await generateText({
++  model: provider.chat(model),
++  system: sys,
++  prompt: withContract ? `${usr}${L1_JSON_OUTPUT_CONTRACT}` : usr,
++  maxOutputTokens: 4096,
++});
++
++console.log(`=== RAW REPLY (contract=${withContract ? "on" : "off"}) ===`);
++console.log(res.text);
++console.log("=== END ===");
+diff --git a/MemoryCore/src/adapters/openclaw/llm-runner.ts b/MemoryCore/src/adapters/openclaw/llm-runner.ts
+index 92c7042..e8bfae0 100644
+--- a/MemoryCore/src/adapters/openclaw/llm-runner.ts
++++ b/MemoryCore/src/adapters/openclaw/llm-runner.ts
+@@ -41,8 +41,14 @@ export class OpenClawLLMRunner implements LLMRunner {
+   }
+ 
+   async run(params: LLMRunParams): Promise<string> {
++    // Pure-text callers may restate a task-specific output contract in the user
++    // turn; honoring it here keeps the semantics identical across hosts
++    // (see LLMRunParams.outputContract in core/types.ts).
++    const prompt = params.outputContract
++      ? `${params.prompt}${params.outputContract}`
++      : params.prompt;
+     return this.runner.run({
+-      prompt: params.prompt,
++      prompt,
+       systemPrompt: params.systemPrompt,
+       taskId: params.taskId,
+       timeoutMs: params.timeoutMs,
+diff --git a/MemoryCore/src/adapters/standalone/llm-runner.ts b/MemoryCore/src/adapters/standalone/llm-runner.ts
+index f84b48a..601c17a 100644
+--- a/MemoryCore/src/adapters/standalone/llm-runner.ts
++++ b/MemoryCore/src/adapters/standalone/llm-runner.ts
+@@ -336,14 +336,31 @@ export class StandaloneLLMRunner implements LLMRunner {
+         ? AbortSignal.any([timeoutSignal, params.abortSignal])
+         : timeoutSignal;
+ 
++      const toolsActive = !!(tools && Object.keys(tools).length > 0);
++
+       const callParams = {
+         model: provider.chat(this.model),
+         system: params.systemPrompt,
+-        prompt: params.prompt,
++        // Some OpenAI-compatible upstreams (agentic chat gateways) treat the
++        // system turn as advisory context and answer conversationally, which
++        // makes a contract that lives only in the system prompt invisible to
++        // the model → parse_fail / empty_scenes downstream. For pure-text tasks
++        // (no tools) the caller restates its own, task-specific contract via
++        // `outputContract`; it is appended last in the user turn, which is the
++        // position the model actually obeys. Tool-driven tasks keep the
++        // original prompt untouched so their tool-call protocol is unaffected,
++        // and callers whose task is not JSON simply omit the field.
++        // (A single global contract cannot serve all tasks: an L1-shaped
++        // example hijacks dedup/keyword-gen into emitting L1 JSON — verified
++        // against the local gateway, 2026-10-11.)
++        prompt:
++          toolsActive || !params.outputContract
++            ? params.prompt
++            : `${params.prompt}${params.outputContract}`,
+         // Only attach tools when actually enabled — passing an empty object
+         // (or even a tools-only-with-`read`) makes some OpenAI-compatible
+         // backends emit spurious tool calls on pure-text tasks.
+-        ...(tools && Object.keys(tools).length > 0
++        ...(toolsActive
+           ? { tools, stopWhen: stepCountIs(maxIterations) }
+           : {}),
+         maxOutputTokens: maxTokens,
+diff --git a/MemoryCore/src/core/prompts/l1-dedup.ts b/MemoryCore/src/core/prompts/l1-dedup.ts
+index 41e73c1..8d577ad 100644
+--- a/MemoryCore/src/core/prompts/l1-dedup.ts
++++ b/MemoryCore/src/core/prompts/l1-dedup.ts
+@@ -234,3 +234,25 @@ ${newMemoriesText}
+ 
+ 请逐条判断并输出决策 JSON 数组。当某条新记忆的候选列表为空时，该条直接输出 action=store。`;
+ }
++
++/**
++ * Task-specific "JSON only, no prose" contract for conflict detection,
++ * restated for the USER turn (see LLMRunParams.outputContract).
++ *
++ * This prompt asks for `record_id/action/target_ids` decisions — an L1-shaped
++ * example would hijack the reply into emitting scene objects instead (verified
++ * against the local gateway 2026-10-11), so each pure-text task carries its
++ * own contract rather than sharing one.
++ */
++export const L1_DEDUP_JSON_OUTPUT_CONTRACT = [
++  "",
++  "",
++  "──────────",
++  "输出要求（必须严格遵守，优先于上文任何对话式回复倾向）：",
++  "只输出一个合法的 JSON 值本身。不要输出 Markdown 代码块围栏（``` 或 ```json），",
++  "不要输出任何解释、前言、结语、致歉或确认语。",
++  "JSON 的字段名、结构、枚举值必须与系统提示中「输出格式」完全一致。",
++  "顶层必须是 JSON 数组，每个元素形如",
++  '{"record_id":"m_new_1","action":"store|update|skip|merge","target_ids":["m_old_1"],"merged_content":"...","merged_type":"persona|episodic|instruction","merged_priority":80,"merged_timestamps":["2026-10-11T00:00:00.000Z"]}',
++  "每一条新记忆都必须有一个元素，action 只能取枚举值之一，target_ids 必须是数组。",
++].join("\n");
+diff --git a/MemoryCore/src/core/prompts/l1-extraction.ts b/MemoryCore/src/core/prompts/l1-extraction.ts
+index 2489a2c..236b5fd 100644
+--- a/MemoryCore/src/core/prompts/l1-extraction.ts
++++ b/MemoryCore/src/core/prompts/l1-extraction.ts
+@@ -415,3 +415,31 @@ ${bgText}
+ 【待提取的新消息】（务必结合 timestamp 推算时间，只从这里提取记忆！）：
+ ${newText}`;
+ }
++
++/**
++ * Task-specific "JSON only, no prose" contract, restated for the USER turn.
++ *
++ * Some OpenAI-compatible upstreams (notably agentic chat gateways) treat the
++ * system turn as advisory context and answer conversationally, so a contract
++ * that lives only in the system prompt never reaches the model and extraction
++ * silently stores nothing. Pure-text callers pass this to the runner via
++ * `LLMRunParams.outputContract`; the runner appends it verbatim as the last
++ * thing the model reads (see adapters/standalone/llm-runner.ts).
++ *
++ * Verified against the local gateway 2026-10-11: without it the gateway
++ * replied with prose/fenced YAML, with it the reply was a clean scene array.
++ * Keep in sync with 任务三 above when the example shape changes.
++ */
++export const L1_JSON_OUTPUT_CONTRACT = [
++  "",
++  "",
++  "──────────",
++  "输出要求（必须严格遵守，优先于上文任何对话式回复倾向）：",
++  "只输出一个合法的 JSON 值本身。不要输出 Markdown 代码块围栏（``` 或 ```json），",
++  "不要输出任何解释、前言、结语、致歉或确认语。",
++  "JSON 的字段名、结构、枚举值必须与系统提示中【任务三：输出格式规范】完全一致。",
++  '顶层必须是 JSON 数组（即使只有一个情境也要写成 [ {...} ]），数组项形如',
++  '{"scene_name":"...","message_ids":["m1"],"memories":[{"content":"...","type":"persona|episodic|instruction","priority":80,"source_message_ids":["m1"],"metadata":{}}]}',
++  "键名必须是复数 memories（不是 memory），value 必须是数组。",
++  "若无可提取内容，也必须输出该规范中定义的空结果结构，而不是空回复。",
++].join("\n");
+diff --git a/MemoryCore/src/core/record/l1-dedup.ts b/MemoryCore/src/core/record/l1-dedup.ts
+index d35c8f3..aac1312 100644
+--- a/MemoryCore/src/core/record/l1-dedup.ts
++++ b/MemoryCore/src/core/record/l1-dedup.ts
+@@ -16,10 +16,10 @@
+ 
+ import type { MemoryPromptMode } from "../../config.js";
+ import type { ExtractedMemory, MemoryRecord, DedupDecision, MemoryType } from "./l1-writer.js";
+-import { formatBatchConflictPrompt, getConflictDetectionSystemPrompt } from "../prompts/l1-dedup.js";
++import { formatBatchConflictPrompt, getConflictDetectionSystemPrompt, L1_DEDUP_JSON_OUTPUT_CONTRACT } from "../prompts/l1-dedup.js";
+ import type { CandidateMatch } from "../prompts/l1-dedup.js";
+ import { CleanContextRunner } from "../../utils/clean-context-runner.js";
+-import { sanitizeJsonForParse } from "../../utils/sanitize.js";
++import { extractOutermostJson, sanitizeJsonForParse } from "../../utils/sanitize.js";
+ import type { IMemoryStore, IsolationFilter, L1SearchResult } from "../store/types.js";
+ import { hasClientEmbedding, type EmbeddingService } from "../store/embedding.js";
+ import type { LLMRunner, Logger, TraceContext } from "../types.js";
+@@ -165,6 +165,9 @@ async function runLlmJudgment(
+         systemPrompt,
+         taskId: "l1-conflict-detection",
+         timeoutMs: 180_000,
++        // Task-specific contract — an L1-shaped one would hijack decisions
++        // into scene objects (see the constant).
++        outputContract: L1_DEDUP_JSON_OUTPUT_CONTRACT,
+         ...traceParams,
+       });
+     } else {
+@@ -344,15 +347,18 @@ function parseBatchResult(
+       cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+     }
+ 
+-    // Extract JSON array
+-    const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+-    if (!arrayMatch) {
++    // Extract the outermost balanced JSON value (same rule as l1-extractor).
++    // A greedy `/\[[\s\S]*\]/` anchored on the first `[` and could never see
++    // an object reply, so an object→array tolerance could not have fired.
++    const jsonSpan = extractOutermostJson(cleaned);
++    if (!jsonSpan) {
+       logger?.warn?.(`${TAG} No JSON array found in conflict detection response`);
+       return fallbackStoreAll(memories);
+     }
++    const jsonSource = jsonSpan.startsWith("[") ? jsonSpan : `[${jsonSpan}]`;
+ 
+     // Sanitize control characters inside JSON string literals that LLM may produce
+-    const sanitized = sanitizeJsonForParse(arrayMatch[0]);
++    const sanitized = sanitizeJsonForParse(jsonSource);
+     const parsed = JSON.parse(sanitized) as unknown[];
+ 
+     if (!Array.isArray(parsed)) {
+@@ -360,11 +366,24 @@ function parseBatchResult(
+       return fallbackStoreAll(memories);
+     }
+ 
++    // Shape tolerance: a wrapper object carrying the decision array (e.g.
++    // `{"decisions":[…]}`) is unwrapped, while a lone decision object stays as
++    // a single-element array. Without this the wrap above would turn a wrapper
++    // reply into one decision-less row and silently degrade every memory to
++    // "store" — the pre-change greedy array match happened to see through it.
++    const decisionItems: unknown[] = (() => {
++      if (parsed.length !== 1) return parsed;
++      const only = parsed[0];
++      if (!only || typeof only !== "object" || "record_id" in (only as Record<string, unknown>)) return parsed;
++      const arrayField = Object.values(only as Record<string, unknown>).find((v) => Array.isArray(v));
++      return Array.isArray(arrayField) ? (arrayField as unknown[]) : parsed;
++    })();
++
+     // Build decisions from LLM output
+     const decisions: DedupDecision[] = [];
+     const validActions = ["store", "update", "merge", "skip"];
+ 
+-    for (const item of parsed) {
++    for (const item of decisionItems) {
+       if (!item || typeof item !== "object") continue;
+       const d = item as Record<string, unknown>;
+ 
+diff --git a/MemoryCore/src/core/record/l1-extractor.test.ts b/MemoryCore/src/core/record/l1-extractor.test.ts
+new file mode 100644
+index 0000000..2c01b8c
+--- /dev/null
++++ b/MemoryCore/src/core/record/l1-extractor.test.ts
+@@ -0,0 +1,213 @@
++import { describe, it, expect, beforeEach, afterEach } from "vitest";
++import fs from "node:fs";
++import os from "node:os";
++import path from "node:path";
++import { extractL1Memories } from "./l1-extractor.js";
++import { L1_JSON_OUTPUT_CONTRACT } from "../prompts/l1-extraction.js";
++import type { ConversationMessage } from "../conversation/l0-recorder.js";
++import type { LLMRunner, LLMRunParams } from "../types.js";
++
++/**
++ * End-to-end regression for the gateway reply shapes observed on 2026-10-11
++ * (real upstream, `deepseek-v4.1-flash` behind an agentic chat gateway):
++ *
++ *   no contract  → fenced ```json single OBJECT `{scene_name, memories:[…]}`
++ *                  (the greedy /\[[\s\S]*\]/ then parsed the inner `memories`
++ *                   array as if it were the scene list → 3 empty scenes →
++ *                   every memory silently dropped) or fenced YAML prose
++ *   contract     → bare array `[{scene_name, message_ids, memories:[…]}]`
++ *
++ * The runner stub replays those exact strings, so these tests pin the whole
++ * path: contract injection, outermost-JSON extraction, object→array wrap, and
++ * the L1EmptyReason diagnostics.
++ */
++
++const MESSAGES: ConversationMessage[] = [
++  {
++    id: "m1",
++    role: "user",
++    content:
++      "我的个人偏好清单：1) 部署脚本必须先做健康检查再启动；2) 所有交付产物放 shared 目录不放 workspace；3) 远程服务器是 119.13.109.93，别名 vps，已配好密钥登录。",
++    timestamp: 1_791_588_843_272,
++  },
++  { id: "m2", role: "assistant", content: "收到，我把三条都记进长期记忆。", timestamp: 1_791_588_844_272 },
++];
++
++/** Reply captured verbatim from the gateway without any user-turn contract. */
++const GATEWAY_OBJECT_REPLY = [
++  "```json",
++  "{",
++  '  "scene_name": "用户个人偏好清单与远程服务器配置",',
++  '  "memories": [',
++  "    {",
++  '      "content": "用户的部署脚本要求：必须先做健康检查再启动。",',
++  '      "timestamp": "2026-10-11T15:08:22.803Z"',
++  "    },",
++  "    {",
++  '      "content": "用户的交付产物存放约定：所有交付产物放在 shared 目录，不放 workspace。",',
++  '      "timestamp": "2026-10-11T15:08:22.803Z"',
++  "    },",
++  "    {",
++  '      "content": "用户的远程服务器信息：IP 为 119.13.109.93，别名 vps，已配置好密钥登录。",',
++  '      "timestamp": "2026-10-11T15:08:22.803Z"',
++  "    }",
++  "  ]",
++  "}",
++  "```",
++].join("\n");
++
++/** YAML prose — the gateway's other, unrecoverable drift. */
++const GATEWAY_YAML_REPLY = [
++  "```yaml",
++  "scene_name: 用户个人偏好清单",
++  "memory_content: |",
++  "  用户的个人偏好（2026-10-11 提出）：",
++  "  1) 部署脚本必须先做健康检查再启动；",
++  "```",
++].join("\n");
++
++/** Reply captured with the contract appended to the user turn. */
++const CONTRACTED_ARRAY_REPLY = JSON.stringify([
++  {
++    scene_name: "个人偏好与服务器信息记录",
++    message_ids: ["m1"],
++    memories: [
++      { content: "部署脚本必须先做健康检查再启动。", type: "instruction", priority: 90, source_message_ids: ["m1"], metadata: {} },
++      { content: "所有交付产物放 shared 目录，不放 workspace。", type: "instruction", priority: 90, source_message_ids: ["m1"], metadata: {} },
++      { content: "远程服务器 IP 为 119.13.109.93，别名 vps，已配置密钥登录。", type: "persona", priority: 85, source_message_ids: ["m1"], metadata: {} },
++    ],
++  },
++]);
++
++interface StubCapture {
++  prompts: string[];
++  outputContracts: Array<string | undefined>;
++}
++
++function makeStubRunner(scripted: string[]): { runner: LLMRunner; capture: StubCapture } {
++  const capture: StubCapture = { prompts: [], outputContracts: [] };
++  let i = 0;
++  const runner: LLMRunner = {
++    async run(params: LLMRunParams) {
++      capture.prompts.push(params.prompt);
++      capture.outputContracts.push(params.outputContract);
++      const reply = scripted[Math.min(i, scripted.length - 1)];
++      i += 1;
++      return reply ?? "";
++    },
++  };
++  return { runner, capture };
++}
++
++function makeLogger(capture: string[]) {
++  return {
++    debug: (m: string) => { capture.push(m); },
++    info: (m: string) => { capture.push(m); },
++    warn: (m: string) => { capture.push(m); },
++    error: (m: string) => { capture.push(m); },
++  };
++}
++
++describe("L1 extraction against observed gateway reply shapes", () => {
++  let baseDir: string;
++  beforeEach(() => { baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "l1-shape-")); });
++  afterEach(() => { fs.rmSync(baseDir, { recursive: true, force: true }); });
++
++  it("recovers every memory from a single-scene OBJECT reply (greedy-array regression)", async () => {
++    const logs: string[] = [];
++    const { runner } = makeStubRunner([GATEWAY_OBJECT_REPLY]);
++
++    const result = await extractL1Memories({
++      messages: MESSAGES,
++      sessionKey: "s-gateway-object",
++      baseDir,
++      config: {},
++      options: { enableDedup: false, llmRunner: runner },
++      logger: makeLogger(logs),
++    });
++
++    expect(result.extractedCount).toBe(3);
++    expect(result.storedCount).toBe(3);
++    // The wrap is observable via the shape-repair diagnostic…
++    expect(logs.some((l) => l.includes("SHAPE_REPAIR object→array"))).toBe(true);
++    // …and the memories actually reached the JSONL shard.
++    const shard = fs.readdirSync(path.join(baseDir, "records"))[0]!;
++    const lines = fs.readFileSync(path.join(baseDir, "records", shard), "utf-8").trim().split("\n");
++    expect(lines).toHaveLength(3);
++    expect(lines.filter((l) => l.includes("部署脚本"))).toHaveLength(1);
++  });
++
++  it("still reports no_json when the gateway answers with YAML prose", async () => {
++    const logs: string[] = [];
++    const { runner } = makeStubRunner([GATEWAY_YAML_REPLY]);
++
++    const result = await extractL1Memories({
++      messages: MESSAGES,
++      sessionKey: "s-gateway-yaml",
++      baseDir,
++      config: {},
++      options: { enableDedup: false, llmRunner: runner },
++      logger: makeLogger(logs),
++    });
++
++    expect(result.extractedCount).toBe(0);
++    expect(logs.some((l) => l.includes("l1-empty reason=no_json"))).toBe(true);
++  });
++
++  it("passes the L1 contract to the runner so the gateway reply stays parseable", async () => {
++    const { runner, capture } = makeStubRunner([CONTRACTED_ARRAY_REPLY]);
++
++    const result = await extractL1Memories({
++      messages: MESSAGES,
++      sessionKey: "s-contract",
++      baseDir,
++      config: {},
++      options: { enableDedup: false, llmRunner: runner },
++    });
++
++    expect(result.extractedCount).toBe(3);
++    expect(capture.outputContracts[0]).toBe(L1_JSON_OUTPUT_CONTRACT);
++    // The runner (not the caller) is responsible for appending it last, so the
++    // caller's prompt must stay untouched and still end with the message block.
++    expect(capture.prompts[0]).toContain("务必结合 timestamp 推算时间，只从这里提取记忆");
++    expect(capture.prompts[0]).not.toContain("输出要求（必须严格遵守");
++  });
++
++  it("keeps the {scenes:[…]} wrapper tolerance", async () => {
++    const reply = JSON.stringify({
++      scenes: [
++        { scene_name: "包装形状", message_ids: ["m1"], memories: [{ content: "包装里的记忆。", type: "episodic", priority: 60, source_message_ids: ["m1"], metadata: {} }] },
++      ],
++    });
++    const { runner } = makeStubRunner([reply]);
++
++    const result = await extractL1Memories({
++      messages: MESSAGES,
++      sessionKey: "s-wrapper",
++      baseDir,
++      config: {},
++      options: { enableDedup: false, llmRunner: runner },
++    });
++
++    expect(result.extractedCount).toBe(1);
++    expect(result.sceneNames).toEqual(["包装形状"]);
++  });
++
++  it("keeps the singular `memory` / bare-string tolerances", async () => {
++    const reply = JSON.stringify([
++      { scene_name: "单数对象", message_ids: ["m1"], memory: { content: "单数形式的记忆。", type: "episodic" } },
++      { scene_name: "裸字符串", message_ids: ["m1"], memory: "裸字符串记忆。" },
++    ]);
++    const { runner } = makeStubRunner([reply]);
++
++    const result = await extractL1Memories({
++      messages: MESSAGES,
++      sessionKey: "s-singular",
++      baseDir,
++      config: {},
++      options: { enableDedup: false, llmRunner: runner },
++    });
++
++    expect(result.extractedCount).toBe(2);
++  });
++});
+diff --git a/MemoryCore/src/core/record/l1-extractor.ts b/MemoryCore/src/core/record/l1-extractor.ts
+index ad0a500..3ae080d 100644
+--- a/MemoryCore/src/core/record/l1-extractor.ts
++++ b/MemoryCore/src/core/record/l1-extractor.ts
+@@ -13,12 +13,12 @@
+  */
+ 
+ import type { ConversationMessage } from "../conversation/l0-recorder.js";
+-import { formatExtractionPrompt, getExtractMemoriesSystemPrompt, type MemoryPromptMode } from "../prompts/l1-extraction.js";
++import { formatExtractionPrompt, getExtractMemoriesSystemPrompt, L1_JSON_OUTPUT_CONTRACT, type MemoryPromptMode } from "../prompts/l1-extraction.js";
+ import { batchDedup } from "./l1-dedup.js";
+ import { writeMemory, generateMemoryId } from "./l1-writer.js";
+ import type { ExtractedMemory, MemoryRecord, MemoryType, DedupDecision } from "./l1-writer.js";
+ import { CleanContextRunner } from "../../utils/clean-context-runner.js";
+-import { sanitizeJsonForParse, shouldExtractL1 } from "../../utils/sanitize.js";
++import { extractOutermostJson, sanitizeJsonForParse, shouldExtractL1 } from "../../utils/sanitize.js";
+ import type { IMemoryStore } from "../store/types.js";
+ import type { EmbeddingService } from "../store/embedding.js";
+ import { report } from "../report/reporter.js";
+@@ -516,6 +516,9 @@ async function callLlmExtraction(params: {
+       systemPrompt,
+       taskId: "l1-extraction",
+       timeoutMs: 180_000,
++      // Restate the JSON contract in the user turn — gateways that downgrade
++      // the system turn reply conversationally otherwise (see the constant).
++      outputContract: L1_JSON_OUTPUT_CONTRACT,
+       ...traceParams,
+     });
+   } else {
+@@ -546,7 +549,7 @@ async function callLlmExtraction(params: {
+  */
+ export type L1EmptyReason =
+   | "llm_error"      // LLM call raised (thrown by callLlmExtraction)
+-  | "no_json"        // /\[[\s\S]*\]/ did not match in raw content
++  | "no_json"        // no balanced JSON value found in raw content
+   | "parse_fail"     // JSON.parse threw on the extracted substring
+   | "not_array"      // parse succeeded but result is not an array
+   | "empty_scenes";  // parse succeeded, array had 0 scenes OR all scenes had 0 memories
+@@ -602,9 +605,19 @@ function parseExtractionResult(raw: string, logger?: Logger): ParseExtractionOut
+       cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+     }
+ 
+-    // Try to extract JSON array
+-    const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+-    if (!arrayMatch) {
++    // Extract the outermost balanced JSON value (array OR object).
++    //
++    // This replaces a greedy `/\[[\s\S]*\]/`, which anchored on the FIRST `[`
++    // in the reply. For a single-scene OBJECT reply that first `[` is the
++    // scene's inner `memories` array, so the extraction parsed
++    // [memory, memory, …] as if it were [scene, scene, …] and silently dropped
++    // every memory as empty_scenes (verified against the local gateway,
++    // 2026-10-11). The object→array tolerance below could never fire for
++    // exactly the replies it was written for: the greedy array match always
++    // won first.
++    const jsonSpan = extractOutermostJson(cleaned);
++    let jsonSource: string;
++    if (!jsonSpan) {
+       logger?.warn?.(`${TAG} No JSON array found in extraction response`);
+       // [l1-debug] NO_JSON — dump the full ORIGINAL raw (not the stripped
+       // version), otherwise a broken <think> variant would leave no trace.
+@@ -614,12 +627,21 @@ function parseExtractionResult(raw: string, logger?: Logger): ParseExtractionOut
+       );
+       return { scenes: [], emptyReason: "no_json" };
+     }
++    // Shape tolerance: some upstreams (notably agentic chat gateways) answer
++    // with a single scene OBJECT where the contract asked for an array of
++    // scenes. Re-wrap it instead of dropping the whole extraction as no_json.
++    if (jsonSpan.startsWith("[")) {
++      jsonSource = jsonSpan;
++    } else {
++      jsonSource = `[${jsonSpan}]`;
++      logger?.warn?.(`${TAG} [l1-debug] SHAPE_REPAIR object→array, len=${jsonSource.length}`);
++    }
+ 
+     // Sanitize control characters inside JSON string literals that LLM may produce.
+     // Some weaker OpenAI-compatible models occasionally emit bare identifiers for
+     // numeric fields (e.g. `"priority": sheet`). Repair only known safe fields and
+     // retry once so one bad scalar does not drop the whole extraction result.
+-    const sanitized = sanitizeJsonForParse(arrayMatch[0]);
++    const sanitized = sanitizeJsonForParse(jsonSource);
+     let parsed: unknown[];
+     try {
+       parsed = JSON.parse(sanitized) as unknown[];
+@@ -635,25 +657,33 @@ function parseExtractionResult(raw: string, logger?: Logger): ParseExtractionOut
+       return { scenes: [], emptyReason: "not_array" };
+     }
+ 
++    // Shape tolerance: accept `{"scenes":[...]}` wrappers and single memories
++    // emitted as `memory` (singular object) or a bare string.
++    const sceneItems: unknown[] =
++      parsed.length === 1 &&
++      parsed[0] &&
++      typeof parsed[0] === "object" &&
++      Array.isArray((parsed[0] as Record<string, unknown>).scenes)
++        ? ((parsed[0] as Record<string, unknown>).scenes as unknown[])
++        : parsed;
++
+     const scenes: SceneSegment[] = [];
+-    for (const item of parsed) {
++    for (const item of sceneItems) {
+       if (!item || typeof item !== "object") continue;
+       const s = item as Record<string, unknown>;
+ 
+       scenes.push({
+         scene_name: typeof s.scene_name === "string" ? s.scene_name : "未知情境",
+         message_ids: Array.isArray(s.message_ids) ? s.message_ids.map(String) : [],
+-        memories: Array.isArray(s.memories)
+-          ? (s.memories as Array<Record<string, unknown>>)
+-              .filter((m) => m && typeof m === "object" && typeof m.content === "string" && (m.content as string).length > 0)
+-              .map((m) => ({
+-                content: String(m.content),
+-                type: String(m.type ?? "episodic"),
+-                priority: typeof m.priority === "number" ? m.priority : 50,
+-                source_message_ids: Array.isArray(m.source_message_ids) ? m.source_message_ids.map(String) : [],
+-                metadata: (m.metadata && typeof m.metadata === "object" ? m.metadata : {}) as Record<string, unknown>,
+-              }))
+-          : [],
++        memories: coerceMemories(s)
++          .filter((m) => m && typeof m === "object" && typeof m.content === "string" && (m.content as string).length > 0)
++          .map((m) => ({
++            content: String(m.content),
++            type: String(m.type ?? "episodic"),
++            priority: typeof m.priority === "number" ? m.priority : 50,
++            source_message_ids: Array.isArray(m.source_message_ids) ? m.source_message_ids.map(String) : [],
++            metadata: (m.metadata && typeof m.metadata === "object" ? m.metadata : {}) as Record<string, unknown>,
++          })),
+       });
+     }
+ 
+@@ -671,6 +701,30 @@ function parseExtractionResult(raw: string, logger?: Logger): ParseExtractionOut
+   }
+ }
+ 
++/**
++ * Normalize the many shapes upstreams use for a scene's memory list.
++ *
++ * Contract shape is `memories: Array<{content, type, ...}>`. Observed drift:
++ * `memory: {...}` (singular object), `memory: "text"` (bare string),
++ * `memory_list: [...]`. Anything unrecognized yields an empty list, matching the
++ * pre-existing behaviour so the caller's empty_reason stays honest.
++ */
++function coerceMemories(scene: Record<string, unknown>): Array<Record<string, unknown>> {
++  const candidates = [scene.memories, scene.memory, scene.memory_list, scene.memoryList];
++  for (const c of candidates) {
++    if (Array.isArray(c)) {
++      return c.filter((m): m is Record<string, unknown> => !!m && typeof m === "object");
++    }
++    if (c && typeof c === "object") {
++      return [c as Record<string, unknown>];
++    }
++    if (typeof c === "string" && c.trim().length > 0) {
++      return [{ content: c }];
++    }
++  }
++  return [];
++}
++
+ function repairExtractionJson(json: string): string {
+   return json
+     .replace(
+diff --git a/MemoryCore/src/core/types.ts b/MemoryCore/src/core/types.ts
+index 543114f..6b9a1e7 100644
+--- a/MemoryCore/src/core/types.ts
++++ b/MemoryCore/src/core/types.ts
+@@ -73,6 +73,17 @@ export interface LLMRunParams {
+   timeoutMs?: number;
+   /** Max output tokens (optional — defaults to model catalog value). */
+   maxTokens?: number;
++  /**
++   * Text appended verbatim to the user turn for pure-text (no-tool) calls.
++   *
++   * Some OpenAI-compatible upstreams front an agentic chat backend and treat
++   * the system turn as advisory, answering conversationally — a JSON-only
++   * contract stated only in the system prompt is then ignored and the reply
++   * fails to parse downstream. Callers whose task needs a restatement pass the
++   * task-specific wording here (see `L1_JSON_OUTPUT_CONTRACT`); the runner
++   * appends it last in the user turn. Ignored for tool-enabled calls.
++   */
++  outputContract?: string;
+   /**
+    * Caller-provided tool dict (Vercel AI SDK shape). When set, REPLACES
+    * the runner's default sandbox tools for this single call. Used by
+diff --git a/MemoryCore/src/utils/sanitize.test.ts b/MemoryCore/src/utils/sanitize.test.ts
+new file mode 100644
+index 0000000..87b5cc1
+--- /dev/null
++++ b/MemoryCore/src/utils/sanitize.test.ts
+@@ -0,0 +1,39 @@
++import { describe, it, expect } from "vitest";
++import { extractOutermostJson } from "./sanitize.js";
++
++describe("extractOutermostJson", () => {
++  it("returns the whole array for an array-first reply", () => {
++    const text = '[{"scene_name":"a","memories":[{"content":"m"}]}]';
++    expect(extractOutermostJson(text)).toBe(text);
++  });
++
++  it("returns the whole object for an object-first reply (inner arrays must not anchor)", () => {
++    // Regression: a greedy /\[[\s\S]*\]/ anchors on the inner `memories` array
++    // here, so the caller parsed three memory objects as if they were scenes and
++    // dropped the extraction as empty_scenes.
++    const text = '{"scene_name":"a","message_ids":["m1"],"memories":[{"content":"x"},{"content":"y"}]}';
++    const span = extractOutermostJson(text);
++    expect(span).toBe(text);
++    expect(JSON.parse(span!).scene_name).toBe("a");
++  });
++
++  it("ignores leading prose and trailing fences", () => {
++    const text = 'Sure! Here is the JSON:\n[{"a":1}]\n```';
++    expect(extractOutermostJson(text)).toBe('[{"a":1}]');
++  });
++
++  it("does not let brackets inside string literals unbalance the scan", () => {
++    const text = '{"note":"use [ ] braces } here","memories":[{"content":"a[b]c"}]}';
++    expect(extractOutermostJson(text)).toBe(text);
++  });
++
++  it("handles escaped quotes inside strings", () => {
++    const text = '{"note":"say \\"hi\\" [x]","memories":[]}';
++    expect(extractOutermostJson(text)).toBe(text);
++  });
++
++  it("returns null when no balanced JSON value exists", () => {
++    expect(extractOutermostJson("no json at all")).toBeNull();
++    expect(extractOutermostJson('{"broken": [1, 2')).toBeNull();
++  });
++});
+diff --git a/MemoryCore/src/utils/sanitize.ts b/MemoryCore/src/utils/sanitize.ts
+index 80ee636..8c3f915 100644
+--- a/MemoryCore/src/utils/sanitize.ts
++++ b/MemoryCore/src/utils/sanitize.ts
+@@ -313,6 +313,62 @@ export function escapeXmlTags(text: string): string {
+  *     a simple global strip of rare control chars (\x00–\x08, \x0b, \x0c,
+  *     \x0e–\x1f) which are almost never meaningful in natural-language content.
+  */
++/**
++ * Extract the outermost balanced JSON value (array or object) from a reply.
++ *
++ * Replaces the greedy `/\[[\s\S]*\]/` extraction, which anchors on the FIRST
++ * `[` in the text — inside a reply whose top level is an object it lands on an
++ * inner array (e.g. a scene's `memories`), so the caller then parses memory
++ * objects as if they were scenes and drops the whole extraction as
++ * `empty_scenes`. Verified against the local gateway (2026-10-11): a reply
++ * shaped `{"scene_name":…,"memories":[…]} ` yielded 3 empty scenes.
++ *
++ * The scan is quote-aware, so brackets inside string literals do not unbalance
++ * it, and it returns the first `[`/`{` span that closes at depth zero —
++ * whichever delimiter comes first wins, matching how a top-level array or a
++ * top-level object both round-trip. Returns null when no balanced value exists.
++ */
++export function extractOutermostJson(text: string): string | null {
++  let start = -1;
++  let open = "";
++  let close = "";
++
++  for (let i = 0; i < text.length; i++) {
++    const ch = text[i]!;
++    if (ch !== "[" && ch !== "{") continue;
++    start = i;
++    open = ch;
++    close = ch === "[" ? "]" : "}";
++    break;
++  }
++  if (start < 0) return null;
++
++  let depth = 0;
++  let inString = false;
++  for (let i = start; i < text.length; i++) {
++    const ch = text[i]!;
++    if (inString) {
++      if (ch === "\\") {
++        i++; // skip the escaped character entirely
++        continue;
++      }
++      if (ch === '"') inString = false;
++      continue;
++    }
++    if (ch === '"') {
++      inString = true;
++      continue;
++    }
++    if (ch === open) {
++      depth++;
++    } else if (ch === close) {
++      depth--;
++      if (depth === 0) return text.slice(start, i + 1);
++    }
++  }
++  return null;
++}
++
+ export function sanitizeJsonForParse(raw: string): string {
+   // Phase 1: Escape control characters inside JSON string literals.
+   // We walk the string character-by-character to properly handle escape sequences.

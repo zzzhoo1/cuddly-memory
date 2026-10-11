@@ -1,0 +1,132 @@
+# 上游补丁回放（MemoryCore L1 JSON 契约 + 形状容错）
+#
+# 为什么放在本仓库：`TencentDB-Agent-Memory` 的改动无法直推（本机 clone 是
+# read-only 上游）。把改动做成 patch 序列，由 CI 在 **pinned SHA 的新鲜检出**
+# 上应用并跑测试——补丁本身因此获得与 Rust 移植同一条可复现标准：
+# 谁都能验，不依赖某台机器的 node_modules。
+#
+# 依赖策略：只装 `vitest` + `crc-32`。`openclaw` 是 type-only import（编译期
+# 擦除，运行时不解析），因此不需要上游那份 1.4G 的完整依赖树；但
+# `l1-extractor.ts` 顶层 import 了 `crc-32`（经 kafka-metric-producer），
+# 该包是硬需求。实测：干净检出 + 这两个包 → 11/11 绿。
+
+name: Upstream patch replay
+
+on:
+  push:
+    paths:
+      - "patches/**"
+      - ".github/workflows/upstream-patches.yml"
+  pull_request:
+    paths:
+      - "patches/**"
+      - ".github/workflows/upstream-patches.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-patches-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # 与 golden-repro 作业共用同一个 pinned 上游 commit：补丁的基线必须与
+  # golden 的基线一致，否则"参考实现"这件事会出现两个真相。
+  UPSTREAM_REPO: https://github.com/TencentCloud/TencentDB-Agent-Memory.git
+  UPSTREAM_SHA: 8b86874a2daea49e3ff0fb53d699203146c5c77d
+
+jobs:
+  replay:
+    name: apply patches to pinned upstream and run their tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v5
+
+      - name: Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Fetch the pinned upstream commit
+        run: |
+          mkdir -p "$RUNNER_TEMP/up"
+          cd "$RUNNER_TEMP/up"
+          git init -q .
+          git remote add origin "$UPSTREAM_REPO"
+          git fetch -q --depth 1 origin "$UPSTREAM_SHA"
+          git checkout -q FETCH_HEAD
+
+      - name: Apply the patch series
+        run: |
+          cd "$RUNNER_TEMP/up"
+          for p in "$GITHUB_WORKSPACE"/patches/*.patch; do
+            echo "== applying $(basename "$p") =="
+            git apply --check "$p"
+            git apply "$p"
+          done
+          echo "PATCHES_APPLIED=$(ls "$GITHUB_WORKSPACE"/patches/*.patch | wc -l)" >> "$GITHUB_ENV"
+
+      - name: Verify the patched files match what the author tested
+        run: |
+          # 补丁必须真正落地：逐个核对关键符号存在，避免"应用成功但内容空转"。
+          cd "$RUNNER_TEMP/up/MemoryCore"
+          grep -q "export function extractOutermostJson" src/utils/sanitize.ts
+          grep -q "export const L1_JSON_OUTPUT_CONTRACT" src/core/prompts/l1-extraction.ts
+          grep -q "export const L1_DEDUP_JSON_OUTPUT_CONTRACT" src/core/prompts/l1-dedup.ts
+          grep -q "outputContract" src/core/types.ts
+          grep -q "outputContract" src/adapters/standalone/llm-runner.ts
+          grep -q "outputContract" src/adapters/openclaw/llm-runner.ts
+          grep -q "L1_JSON_OUTPUT_CONTRACT" src/core/record/l1-extractor.ts
+          grep -q "L1_DEDUP_JSON_OUTPUT_CONTRACT" src/core/record/l1-dedup.ts
+          test -f src/utils/sanitize.test.ts
+          test -f src/core/record/l1-extractor.test.ts
+          # 旧的可疑写法必须消失（贪婪数组正则已全部替换）
+          ! grep -rn 'match(/\\\[\[\\s\\S\]\*\\\]/)' src --include='*.ts'
+          echo "all patched symbols present; legacy greedy regex gone"
+
+      - name: Install the minimal test dependency set
+        run: |
+          # 装到独立目录再软链：直接在上游 MemoryCore/ 里跑 npm install 会让
+          # arborist 解析它那份完整依赖树（含需本地编译的 node-llama-cpp）。
+          # --legacy-peer-deps 规避 npm 10.9.9 的 arborist peer 解析崩溃
+          # （#loadPeerSet 在递归 @vitejs/devtools-vitest 时抛 edgesOut）。
+          mkdir -p "$RUNNER_TEMP/deps"
+          cd "$RUNNER_TEMP/deps"
+          echo '{"name":"replay-deps","private":true}' > package.json
+          npm install --no-fund --no-audit --ignore-scripts --legacy-peer-deps \
+            vitest@4.1.11 crc-32@1.2.2
+          ln -s "$RUNNER_TEMP/deps/node_modules" "$RUNNER_TEMP/up/MemoryCore/node_modules"
+          "$RUNNER_TEMP/deps/node_modules/.bin/vitest" --version
+
+      - name: Run the tests the patch adds
+        run: |
+          cd "$RUNNER_TEMP/up/MemoryCore"
+          "$RUNNER_TEMP/deps/node_modules/.bin/vitest" run \
+            src/utils/sanitize.test.ts src/core/record/l1-extractor.test.ts
+
+      - name: Prove the tests are not vacuous
+        run: |
+          # 反向验证：回退**实现**文件（补丁新增的测试文件是 untracked，会留下），
+          # 测试必须失败。若这里也绿，说明测试没在测东西——那比没测试更糟。
+          cd "$RUNNER_TEMP/up"
+          git checkout -- \
+            MemoryCore/src/utils/sanitize.ts \
+            MemoryCore/src/core/types.ts \
+            MemoryCore/src/core/prompts/l1-extraction.ts \
+            MemoryCore/src/core/prompts/l1-dedup.ts \
+            MemoryCore/src/core/record/l1-extractor.ts \
+            MemoryCore/src/core/record/l1-dedup.ts \
+            MemoryCore/src/adapters/standalone/llm-runner.ts \
+            MemoryCore/src/adapters/openclaw/llm-runner.ts
+          echo "implementation reverted; test files remain:"
+          ls -1 MemoryCore/src/utils/sanitize.test.ts MemoryCore/src/core/record/l1-extractor.test.ts
+          cd "$RUNNER_TEMP/up/MemoryCore"
+          if "$RUNNER_TEMP/deps/node_modules/.bin/vitest" run \
+               src/utils/sanitize.test.ts src/core/record/l1-extractor.test.ts >/dev/null 2>&1; then
+            echo "::error::tests passed WITHOUT the implementation patch — they are vacuous"
+            exit 1
+          fi
+          echo "tests fail without the implementation patch, as they must"
