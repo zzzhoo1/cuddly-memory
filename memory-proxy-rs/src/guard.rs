@@ -11,6 +11,7 @@
 //! 4. body wire 字节序由 guard.ts 对象字面量插入顺序决定：
 //!    - anthropic：`{"type":"error","error":{"type":"…","message":"…"}}`
 //!    - openai：`{"error":{"message":"…","type":"…","code":"…","param":null}}`
+//!
 //!    golden 的 body 是 `canon()` 键排序渲染，只能做结构断言（rule 5）。
 //! 5. openai 分支独有 `code` 字段：`qpm → "qpm_exceeded"`，其余 →
 //!    `"input_tpm_exceeded"`（同样 `!==` 语义）。

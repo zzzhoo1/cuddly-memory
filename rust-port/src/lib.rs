@@ -21,6 +21,7 @@
 //!      - case9  retryAfterSeconds = -3   -> `retry-after: "1"`, `x-ratelimit-reset-seconds: "1"`
 //!      - case2  retryAfterSeconds = 0    -> `retry-after: "1"`, `x-ratelimit-reset-seconds: "1"`
 //!      - case3  retryAfterSeconds = 86400-> emitted verbatim (no upper clamp)
+//!
 //!    Note `Math.max` is applied to the *decision field*, not to a floored value,
 //!    so a fractional input (e.g. 1.9) would stay 1.9 -- `String(1.9)` = "1.9".
 //!    No golden case covers that; the port keeps JS `Number -> String` semantics.
