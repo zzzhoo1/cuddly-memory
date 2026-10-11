@@ -76,7 +76,7 @@ fn openai_case2_tpm_retry_0_clamped_to_1() {
     let v: Value = serde_json::from_str(raw).unwrap();
     let d: Decision = serde_json::from_value(v["responses"][2]["decision"].clone()).unwrap();
     assert_eq!(to_f64(&d.retry_after_seconds), 0.0);
-    assert_eq!(d.reason, "tpm");
+    assert_eq!(d.reason.as_deref(), Some("tpm"));
 }
 
 #[test]

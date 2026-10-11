@@ -15,12 +15,21 @@
 //! | `usage.ts:7` | `getActualInputTokens(usage, protocol)` | [`usage::get_actual_input_tokens`] |
 //! | `usage.ts:19` | `numberField(value)` | [`usage::number_field`]（JS `Number()` 语义） |
 //! | `redis-store.ts:324` | `dimensionField(instanceId, modelId)` | [`dimension::dimension_field`] |
+//! | `redis-store.ts:148` | `dimensionKeys()`（sha256 → 32 hex 命名空间） | [`store::dimension_keys`] |
+//! | `redis-store.ts:301` | `degradedDecision()`（fail-open） | [`store::degraded_decision`] |
+//! | `redis-store.ts:162` | `checkRequest` 的 KEYS/ARGV 编组 | [`store::check_request_eval`] |
+//! | `redis-store.ts:198` | `recordInputTokens` 的 KEYS/ARGV 编组 | [`store::record_tokens_eval`] |
+//! | `redis-store.ts:225` | `getLimits()` 回退规则 | [`store::limits_from_hash`] |
+//! | `redis-store.ts:246` | override 解析（对象/裸值/非 JSON） | [`store::parse_override`] |
 //!
 //! # 显式不在范围（网络/IO 层，无 golden 可 diff）
 //!
-//! - `redis-store.ts` 的 `RedisRateLimitStore`（Redis Lua eval、连接池）
-//! - `guard.ts:21` 的 `enforceRateLimit`（组合 store 与 builder 的编排层）
-//!   其中的纯判定分支（fail-open 节流告警）未来可在 store 落地后一并移植。
+//! - `redis-store.ts` 的 Redis **连接与 eval 往返**（ioredis 连接池、重试）。
+//!   键派生与调用编组已在 [`store`] 覆盖，Lua 脚本身份由 `scriptDigest` 钉住。
+//! - `redis-store.ts` 的 `listOverrides()` **排序**：TS 用 `localeCompare`，
+//!   结果随 ICU/默认 locale 变化（实测与码点序在 `a1`/`A1` 等处分歧），
+//!   不是环境无关的确定性面。
+//! - `guard.ts:21` 的 `enforceRateLimit`（组合 store 与 builder 的编排层）。
 //!
 //! # 方法论（从 POC `rust-port/` 验证后沿用）
 //!
@@ -38,10 +47,15 @@ pub mod decision;
 pub mod dimension;
 pub mod display;
 pub mod guard;
+pub mod store;
 pub mod usage;
 
 pub use decision::{Decision, Protocol};
 pub use dimension::dimension_field;
 pub use display::js_number_to_string;
 pub use guard::{build_rate_limit_response, BuiltResponse};
+pub use store::{
+    check_request_eval, degraded_decision, dimension_keys, limits_from_hash, parse_override,
+    record_tokens_eval, DimensionKeys, EvalCall, RateLimitConfig, KEY_PREFIX, WINDOW_SECONDS,
+};
 pub use usage::{get_actual_input_tokens, number_field, to_f64};

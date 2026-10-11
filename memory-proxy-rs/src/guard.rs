@@ -33,8 +33,8 @@ pub struct BuiltResponse {
 const MSG_QPM: &str = "该模型请求频率已达上限，请稍后重试";
 const MSG_TPM: &str = "该模型输入 Token 用量已达上限，请稍后重试";
 
-fn message_for(reason: &str) -> &'static str {
-    if reason == "qpm" {
+fn message_for(reason: Option<&str>) -> &'static str {
+    if reason == Some("qpm") {
         MSG_QPM
     } else {
         MSG_TPM
@@ -43,7 +43,7 @@ fn message_for(reason: &str) -> &'static str {
 
 /// `guard.ts:96`。双协议 429 构建，`status` 恒 429。
 pub fn build_rate_limit_response(protocol: Protocol, decision: &Decision) -> BuiltResponse {
-    let message = message_for(&decision.reason);
+    let message = message_for(decision.reason.as_deref());
 
     let body_bytes = match protocol {
         Protocol::Anthropic => {
@@ -55,7 +55,7 @@ pub fn build_rate_limit_response(protocol: Protocol, decision: &Decision) -> Bui
         }
         Protocol::Openai => {
             // guard.ts:104-110 插入顺序：message, type, code, param
-            let code = if decision.reason == "qpm" {
+            let code = if decision.reason.as_deref() == Some("qpm") {
                 "qpm_exceeded"
             } else {
                 "input_tpm_exceeded"

@@ -358,6 +358,115 @@
       "status": 429
     }
   ],
+  "storeKeys": [
+    {
+      "digest": "65b28647480c1703e217b3f2c1838b90",
+      "dimension": "[\"inst-1\",\"gpt-4o\"]",
+      "instanceId": "inst-1",
+      "modelId": "gpt-4o",
+      "reqCounts": "{rl}:req:65b28647480c1703e217b3f2c1838b90:cnt",
+      "reqIndex": "{rl}:req:65b28647480c1703e217b3f2c1838b90:idx",
+      "tokCounts": "{rl}:tok:65b28647480c1703e217b3f2c1838b90:cnt",
+      "tokIndex": "{rl}:tok:65b28647480c1703e217b3f2c1838b90:idx"
+    },
+    {
+      "digest": "439083f38956ba51ece90631552c6ea2",
+      "dimension": "[\"\",\"\"]",
+      "instanceId": "",
+      "modelId": "",
+      "reqCounts": "{rl}:req:439083f38956ba51ece90631552c6ea2:cnt",
+      "reqIndex": "{rl}:req:439083f38956ba51ece90631552c6ea2:idx",
+      "tokCounts": "{rl}:tok:439083f38956ba51ece90631552c6ea2:cnt",
+      "tokIndex": "{rl}:tok:439083f38956ba51ece90631552c6ea2:idx"
+    },
+    {
+      "digest": "14533b1a9481163f36d90b428c507dca",
+      "dimension": "[\"with\\\"quote\",\"back\\\\slash\"]",
+      "instanceId": "with\"quote",
+      "modelId": "back\\slash",
+      "reqCounts": "{rl}:req:14533b1a9481163f36d90b428c507dca:cnt",
+      "reqIndex": "{rl}:req:14533b1a9481163f36d90b428c507dca:idx",
+      "tokCounts": "{rl}:tok:14533b1a9481163f36d90b428c507dca:cnt",
+      "tokIndex": "{rl}:tok:14533b1a9481163f36d90b428c507dca:idx"
+    },
+    {
+      "digest": "f020f32b91a02604e4d9c54ec3c2a162",
+      "dimension": "[\"unicode-é中文\",\"模型-🚀\"]",
+      "instanceId": "unicode-é中文",
+      "modelId": "模型-🚀",
+      "reqCounts": "{rl}:req:f020f32b91a02604e4d9c54ec3c2a162:cnt",
+      "reqIndex": "{rl}:req:f020f32b91a02604e4d9c54ec3c2a162:idx",
+      "tokCounts": "{rl}:tok:f020f32b91a02604e4d9c54ec3c2a162:cnt",
+      "tokIndex": "{rl}:tok:f020f32b91a02604e4d9c54ec3c2a162:idx"
+    },
+    {
+      "digest": "2258f52c130c3d4f176337f329cb97ce",
+      "dimension": "[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\"]",
+      "instanceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "modelId": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "reqCounts": "{rl}:req:2258f52c130c3d4f176337f329cb97ce:cnt",
+      "reqIndex": "{rl}:req:2258f52c130c3d4f176337f329cb97ce:idx",
+      "tokCounts": "{rl}:tok:2258f52c130c3d4f176337f329cb97ce:cnt",
+      "tokIndex": "{rl}:tok:2258f52c130c3d4f176337f329cb97ce:idx"
+    }
+  ],
+  "storeOps": [
+    {
+      "calls": [
+        {
+          "argv": [
+            "[\"inst-1\",\"gpt-4o\"]",
+            "1000",
+            "20",
+            "60"
+          ],
+          "keys": [
+            "{rl}:config",
+            "{rl}:overrides",
+            "{rl}:req:65b28647480c1703e217b3f2c1838b90:idx",
+            "{rl}:req:65b28647480c1703e217b3f2c1838b90:cnt",
+            "{rl}:tok:65b28647480c1703e217b3f2c1838b90:idx",
+            "{rl}:tok:65b28647480c1703e217b3f2c1838b90:cnt"
+          ],
+          "numKeys": 6,
+          "op": "eval",
+          "scriptDigest": "1aa9ed4a955b661ddbf5470ee3a61b73"
+        },
+        {
+          "argv": [
+            "60",
+            "42"
+          ],
+          "keys": [
+            "{rl}:tok:65b28647480c1703e217b3f2c1838b90:idx",
+            "{rl}:tok:65b28647480c1703e217b3f2c1838b90:cnt"
+          ],
+          "numKeys": 2,
+          "op": "eval",
+          "scriptDigest": "256c5b308effee57e1329d83af8ab6a3"
+        }
+      ],
+      "op": "checkRequest+recordInputTokens"
+    },
+    {
+      "check": {
+        "allowed": true,
+        "degraded": true,
+        "degradedReason": "redis_unavailable",
+        "qpm": 20,
+        "reason": null,
+        "remainingRequests": 20,
+        "remainingTokens": 1000,
+        "retryAfterSeconds": 0,
+        "tpm": 1000,
+        "usedRequests": 0,
+        "usedTokens": 0
+      },
+      "isAvailable": false,
+      "op": "degradedDecision(no client)",
+      "record": false
+    }
+  ],
   "usage": [
     {
       "expected": 0,

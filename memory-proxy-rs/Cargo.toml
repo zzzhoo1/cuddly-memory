@@ -6,6 +6,8 @@ description = "Fidelity Rust port of the deterministic core of TencentDB-Agent-M
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+# 复用根 crate 的手写 SHA-256（store 的键派生要用），避免第二份实现
+ratelimit-core = { path = ".." }
 serde_json = "1"
 
 [lib]

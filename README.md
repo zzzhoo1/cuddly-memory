@@ -38,12 +38,21 @@
 
 ## CI（GitHub Actions）
 
-构建与测试全部在 CI 执行（本地不加编译步骤）。push / PR 触发三个任务：
+三种门禁：push / PR 触发三个任务，另有本地等价命令供离线复现。
 
-| 任务 | 内容 |
-|---|---|
-| `test` | 三个 crate 分别 `cargo test --locked` |
-| `lint` | `cargo fmt --check`；`cargo clippy --all-targets -- -D warnings` |
-| `golden-repro` | 取 pinned 上游 commit → `ioredis@5.11.1` → `tsx@4.23.15` 重生成 → 与 `golden.json` 字节比对 → `scripts/split-golden.mjs --check` |
+| 任务 | 内容 | 本地等价 |
+|---|---|---|
+| `test` | 三个 crate 分别 `cargo test --locked` | `cargo test --locked --offline --manifest-path <c>` |
+| `lint` | `cargo fmt --check`；`cargo clippy --all-targets -- -D warnings` | 同左（加 `--offline`） |
+| `golden-repro` | 取 pinned 上游 commit → `ioredis@5.11.1` → `tsx@4.23.15` 重生成 → 与 `golden.json` 字节比对 → `scripts/split-golden.mjs --check` | 需上游检出，见上方「重新生成」段 |
+
+本地验证（2026-10-11 实战记录）：rustc 1.99.0 下三个 crate 共 **42 个测试全绿**，
+`fmt` / `clippy -D warnings` 零告警；生成器两次运行字节一致。安装工具链：
+
+```bash
+curl -sSL -o rustup-init https://static.rust-lang.org/rustup/dist/aarch64-unknown-linux-gnu/rustup-init
+chmod +x rustup-init && RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup \
+  ./rustup-init -y --no-modify-path --default-toolchain stable --profile minimal
+```
 
 工具链：CI 使用 GitHub Actions 的 stable。

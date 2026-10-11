@@ -24,12 +24,20 @@ pub enum Protocol {
 ///
 /// `degraded` 是不透明 `Value`：golden 里为 `false`（正常路径）或 `{}`（
 /// canon 后的 `new Error()`）。builder 从不读它（POC lib.rs 规则 3）。
+///
+/// `reason` 是 `"tpm" | "qpm" | null`——degraded 路径下为 `null`（见
+/// `storeOps[1].check`），所以是 `Option<String>`。guard 层只在
+/// `=== "qpm"` 时给 qpm 文案，`None` 与任何其他值走同一分支。
+///
+/// `degradedReason` 只在 degraded 时出现（`redis_unavailable` 或错误消息）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Decision {
     pub allowed: bool,
     pub degraded: Value,
-    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub degraded_reason: Option<String>,
+    pub reason: Option<String>,
     pub tpm: Value,
     pub qpm: Value,
     pub used_tokens: Value,
